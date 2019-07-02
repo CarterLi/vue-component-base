@@ -1,0 +1,16 @@
+{
+  "name": "vue-component-base",
+  "version": "0.0.1",
+  "main": "index.ts",
+  "repository": "git@github.com:CarterLi/vue-component-base.git",
+  "author": "李通洲 <carter.li@eoitek.com>",
+  "license": "MIT",
+  "dependencies": {
+    "reflect-metadata": "^0.1.13",
+    "vue": "^2.6.10"
+  },
+  "devDependencies": {
+    "@types/node": "^12.0.10",
+    "typescript": "^3.5.2"
+  }
+}
