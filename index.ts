@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import Vue, { ComponentOptions, PropOptions } from 'vue';
 import { LIFECYCLE_HOOKS } from 'vue/src/shared/constants.js';
-import { Constructor } from 'vue/types/options';
+import { Constructor, WatchOptions, WatchOptionsWithHandler } from 'vue/types/options';
 
 const $lifecycleHooks = new Set<string>(LIFECYCLE_HOOKS);
 
@@ -61,18 +61,21 @@ type Decorator = (prototype: any, prop: string) => void;
 export const Prop: (config?: PropOptions) => Decorator = decorateField.bind(null, 'props');
 export const Ref: (refKey?: string) => Decorator = decorateField.bind(null, 'refs');
 
-function decorateMethod(type: string, data: string) {
+function decorateMethod(type: string, data?: string, option?: object) {
   return function decorate(clazz: any, fn: string) {
     console.assert(!clazz[fn][VueMethod], `The method ${fn} has been used as another special method`);
     clazz[fn][VueMethod] = {
       type,
       data: data || fn,
+      option,
     };
   };
 }
 
-export const Watch: (prop?: string) => Decorator = decorateMethod.bind(null, 'watch');
+export const Watch: (prop?: string, option?: WatchOptions) => Decorator = decorateMethod.bind(null, 'watch');
 export const Filter: (name?: string) => Decorator = decorateMethod.bind(null, 'filters');
+
+export const NoCache = decorateMethod('nocache');
 
 export function Component(...options: Array<ComponentOptions<any>>) {
   return (clazz: Constructor) => {
@@ -146,10 +149,18 @@ export function Component(...options: Array<ComponentOptions<any>>) {
           opts.computed[properity] = {
             get: descriptor.get,
             set: descriptor.set,
+            cache: descriptor.get[VueMethod] && descriptor.get[VueMethod].type === 'nocache',
           };
         } else if (descriptor.value[VueMethod]) {
-          const { type, data } = descriptor.value[VueMethod];
-          opts[type][data] = descriptor.value;
+          const { type, data, option } = descriptor.value[VueMethod];
+          if (!option) {
+            opts[type][data] = descriptor.value;
+          } else if (type === 'watch') {
+            opts.watch[data] = {
+              ...option as WatchOptions,
+              handler: descriptor.value,
+            } as WatchOptionsWithHandler<any>;
+          }
         } else {
           opts.methods[properity] = descriptor.value as (this: any, ...args: any[]) => any;
         }

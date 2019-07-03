@@ -89,7 +89,7 @@ export default class MyComponent extends VueComponentBase { // NOT `extends Vue`
 
   doSomeAction() {} // Normal method
 
-  @Watch('field') // https://github.com/kaorun343/vue-property-decorator#-watchpath-string-options-watchoptions---decorator No WatchOptions support yet
+  @Watch('field') // https://github.com/kaorun343/vue-property-decorator#-watchpath-string-options-watchoptions---decorator
   onFieldChange(val: string, oldVal: string) {}
 
   @Filter('myFilter')
