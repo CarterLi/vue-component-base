@@ -1,9 +1,9 @@
 import 'reflect-metadata';
-import Vue, { ComponentOptions, PropOptions } from 'vue';
+import Vue, { ComponentOptions, CreateElement, PropOptions, VNode } from 'vue';
 import { LIFECYCLE_HOOKS } from 'vue/src/shared/constants.js';
-import { Constructor, WatchOptions, WatchOptionsWithHandler } from 'vue/types/options';
+import { WatchOptions, WatchOptionsWithHandler } from 'vue/types/options';
 
-const $lifecycleHooks = new Set<string>(LIFECYCLE_HOOKS);
+const $internalHooks = new Set<string>([...LIFECYCLE_HOOKS, 'render', 'renderError']);
 
 interface VueComponentBase extends Vue {
   // tslint:disable-next-line: no-misused-new
@@ -31,8 +31,10 @@ interface VueComponentBase extends Vue {
   destroyed?(): void;
   /** Called when an error from any descendent component is captured. */
   errorCaptured?(err: Error, vm: Vue, info: string): boolean | void;
-
   serverPrefetch?(): Promise<void>;
+
+  render?(createElement: CreateElement): VNode;
+  renderError?(createElement: CreateElement, err: Error): VNode;
 }
 
 /** A fake base class generally for static type checking of TypeScript */
@@ -77,17 +79,15 @@ export const Filter: (name?: string) => Decorator = decorateMethod.bind(null, 'f
 
 export const NoCache = decorateMethod('nocache');
 
-export function Component(...options: Array<ComponentOptions<any>>) {
-  return (clazz: Constructor) => {
+export function Component(...mixins: Array<ComponentOptions<any>>) {
+  return (clazz: VueComponentBase) => {
     const { prototype } = clazz;
     if (!prototype[VueField]) prototype[VueField] = {};
 
     const opts: ComponentOptions<any> = {
-      beforeCreate: [
-        function initData(this: Vue) {
+      mixins: [...mixins, {
+        beforeCreate(this: Vue) {
           const instance = new clazz();
-          // FIXME: Is this necessary?
-          // Object.setPrototypeOf(instance, Object.prototype);
 
           const inreactiveProps = clazz.prototype[VueInreactive] as string[];
           if (inreactiveProps) {
@@ -115,8 +115,14 @@ export function Component(...options: Array<ComponentOptions<any>>) {
           }
 
           this.$options.data = instance;
-        },
-      ],
+
+          Object.defineProperties(this, Object.fromEntries<PropertyDescriptor>(
+            (prototype[VueField].refs || []).map(([field, refKey = field]) => [field, {
+              get() { return this.$refs[refKey]; },
+            }]),
+          ));
+        }
+      }],
       props: Object.fromEntries<PropOptions>(
         (prototype[VueField].props || []).map(([field, config = {}]) => [field,
           !config.type && process.env.NODE_ENV !== 'production'
@@ -124,33 +130,29 @@ export function Component(...options: Array<ComponentOptions<any>>) {
             : config,
         ]),
       ),
-      computed: Object.fromEntries<() => any>(
-        (prototype[VueField].refs || []).map(([field, refKey = field]) => [field, {
-          cache: false,
-          get() { return this.$refs[refKey]; },
-        }]),
-      ),
+      computed: {},
       methods: {},
       filters: {},
       watch: {},
-      render: prototype.render,
-      ...Object.assign({}, ...options),
     };
 
     // Forwards class methods to vue methods
     for (let proto = prototype; proto && proto !== Object.prototype; proto = Object.getPrototypeOf(proto)) {
-      for (const [properity, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(proto))) {
-        if (properity === 'constructor') continue;
+      for (const [property, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(proto))) {
+        if (property === 'constructor') continue;
         console.assert(typeof (descriptor.value || descriptor.get || descriptor.set) === 'function', `Don't set normal properties on prototype of the class`);
 
-        if ($lifecycleHooks.has(properity)) {
-          (opts[properity] || (opts[properity] = [])).push(descriptor.value);
+        if ($internalHooks.has(property)) {
+          opts[property] = descriptor.value;
         } else if (descriptor.get || descriptor.set) {
-          opts.computed[properity] = {
+          opts.computed[property] = {
             get: descriptor.get,
             set: descriptor.set,
             cache: descriptor.get[VueMethod] && descriptor.get[VueMethod].type === 'nocache',
           };
+          if (process.env.NODE_ENV !== 'production') {
+            delete proto[property]; // Silence Vue dev warnings
+          }
         } else if (descriptor.value[VueMethod]) {
           const { type, data, option } = descriptor.value[VueMethod];
           if (!option) {
@@ -162,7 +164,7 @@ export function Component(...options: Array<ComponentOptions<any>>) {
             } as WatchOptionsWithHandler<any>;
           }
         } else {
-          opts.methods[properity] = descriptor.value as (this: any, ...args: any[]) => any;
+          opts.methods[property] = descriptor.value as (this: any, ...args: any[]) => any;
         }
       }
     }
@@ -172,5 +174,5 @@ export function Component(...options: Array<ComponentOptions<any>>) {
 }
 
 Component.registerHooks = (hooks: string[]) => {
-  hooks.forEach(x => $lifecycleHooks.add(x));
+  hooks.forEach(x => $internalHooks.add(x));
 };
