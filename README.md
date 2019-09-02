@@ -92,9 +92,6 @@ export default class MyComponent extends VueComponentBase { // NOT `extends Vue`
   @Watch('field') // https://github.com/kaorun343/vue-property-decorator#-watchpath-string-options-watchoptions---decorator
   onFieldChange(val: string, oldVal: string) {}
 
-  @Filter('myFilter')
-  myFilter(value: any) {} // Component level custom filter
-
   get computedVar() { // Computed properties
     return 'field: ' + this.field;
   }
@@ -126,6 +123,10 @@ export default class PageComponent extends VueComponentBase {
   }
 }
 ```
+
+## Limitations: `this` in constructor
+
+* Accessing props in constructor: In `vuejs/vue-class-component`
 
 ## License
 

@@ -3,10 +3,22 @@ import Vue, { ComponentOptions, CreateElement, PropOptions, VNode } from 'vue';
 import { LIFECYCLE_HOOKS } from 'vue/src/shared/constants.js';
 import { WatchOptions, WatchOptionsWithHandler } from 'vue/types/options';
 
+// import { isEmpty } from 'lodash-es';
+
+function isEmpty(obj: object) {
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 const $internalHooks = new Set<string>([...LIFECYCLE_HOOKS, 'render', 'renderError']);
 
 interface VueComponentBase extends Vue {
-  // tslint:disable-next-line: no-misused-new
+  // tslint:disable-next-line:no-misused-new
   new(): VueComponentBase;
 
   /** Called synchronously immediately after the instance has been initialized, before data observation and event/watcher setup. */
@@ -37,17 +49,21 @@ interface VueComponentBase extends Vue {
   renderError?(createElement: CreateElement, err: Error): VNode;
 }
 
+let currentComponentProps: Record<string, any>;
+
 /** A fake base class generally for static type checking of TypeScript */
-export const VueComponentBase = Object as any as VueComponentBase;
+export const VueComponentBase = class {
+  constructor() { return Object.create(currentComponentProps); }
+} as any as VueComponentBase;
 
 const VueInreactive = Symbol('vue-inreactive');
-const VueField = Symbol('vue-decorate-field');
-const VueMethod = Symbol('vue-decorate-method');
 
 export function Inreactive(prototype: any, prop: string) {
   const inreactives: string[] = prototype[VueInreactive] || (prototype[VueInreactive] = []);
   inreactives.push(prop);
 }
+
+const VueField = Symbol('vue-decorate-field');
 
 function decorateField(type: string, data?: any) {
   return function decorate(prototype: any, field: string) {
@@ -63,21 +79,14 @@ type Decorator = (prototype: any, prop: string) => void;
 export const Prop: (config?: PropOptions) => Decorator = decorateField.bind(null, 'props');
 export const Ref: (refKey?: string) => Decorator = decorateField.bind(null, 'refs');
 
-function decorateMethod(type: string, data?: string, option?: object) {
+const VueWatches = Symbol('vue-decorate-watch');
+
+export function Watch(prop?: string, option?: WatchOptions): Decorator {
   return function decorate(clazz: any, fn: string) {
-    console.assert(!clazz[fn][VueMethod], `The method ${fn} has been used as another special method`);
-    clazz[fn][VueMethod] = {
-      type,
-      data: data || fn,
-      option,
-    };
+    const watches: any[] = clazz[fn][VueWatches] || (clazz[fn][VueWatches] = []);
+    watches.push({ prop, option });
   };
 }
-
-export const Watch: (prop?: string, option?: WatchOptions) => Decorator = decorateMethod.bind(null, 'watch');
-export const Filter: (name?: string) => Decorator = decorateMethod.bind(null, 'filters');
-
-export const NoCache = decorateMethod('nocache');
 
 export function Component(...mixins: Array<ComponentOptions<any>>) {
   return (clazz: VueComponentBase) => {
@@ -87,23 +96,22 @@ export function Component(...mixins: Array<ComponentOptions<any>>) {
     const opts: ComponentOptions<any> = {
       mixins: [...mixins, {
         beforeCreate(this: Vue) {
+          currentComponentProps = this.$options.propsData;
+          if (isEmpty(currentComponentProps)) currentComponentProps = null;
           const instance = new clazz();
+          if (currentComponentProps) Object.setPrototypeOf(instance, null);
 
           const inreactiveProps = clazz.prototype[VueInreactive] as string[];
           if (inreactiveProps) {
             for (const prop of inreactiveProps) {
-              if (instance.hasOwnProperty(prop)) {
+              if (prop in instance) {
                 if (instance[prop] !== undefined) {
                   const propDef: PropOptions<any> = this.$options.props[prop];
                   if (propDef) {
-                    if (process.env.NODE_ENV !== 'production') {
-                      const val = instance[prop];
-                      propDef.default = () => val; // Silence Vue dev warnings
-                      if (propDef.type === Object) {
-                        propDef.type = Object(val).constructor;
-                      }
-                    } else {
-                      propDef.default = instance[prop];
+                    const val = instance[prop];
+                    propDef.default = () => val; // Silence Vue dev warnings
+                    if (propDef.type === Object) {
+                      propDef.type = Object(val).constructor;
                     }
                   } else {
                     this[prop] = instance[prop];
@@ -121,11 +129,14 @@ export function Component(...mixins: Array<ComponentOptions<any>>) {
               get() { return this.$refs[refKey]; },
             }]),
           ));
-        }
+        },
+        created() {
+          Object.setPrototypeOf(this.$data, this);
+        },
       }],
       props: Object.fromEntries<PropOptions>(
         (prototype[VueField].props || []).map(([field, config = {}]) => [field,
-          !config.type && process.env.NODE_ENV !== 'production'
+          !config.type
             ? Object.assign({ type: Reflect.getMetadata('design:type', prototype, field) }, config)
             : config,
         ]),
@@ -148,22 +159,20 @@ export function Component(...mixins: Array<ComponentOptions<any>>) {
           opts.computed[property] = {
             get: descriptor.get,
             set: descriptor.set,
-            cache: descriptor.get[VueMethod] && descriptor.get[VueMethod].type === 'nocache',
           };
-          if (process.env.NODE_ENV !== 'production') {
-            delete proto[property]; // Silence Vue dev warnings
-          }
-        } else if (descriptor.value[VueMethod]) {
-          const { type, data, option } = descriptor.value[VueMethod];
-          if (!option) {
-            opts[type][data] = descriptor.value;
-          } else if (type === 'watch') {
-            opts.watch[data] = {
-              ...option as WatchOptions,
-              handler: descriptor.value,
-            } as WatchOptionsWithHandler<any>;
-          }
         } else {
+          const watches = descriptor.value[VueWatches] as Array<{
+            prop: string,
+            option: WatchOptions,
+          }>;
+          if (watches) {
+            watches.forEach(({ prop, option }) => {
+              opts.watch[prop] = {
+                ...option,
+                handler: descriptor.value,
+              } as WatchOptionsWithHandler<any>;
+            });
+          }
           opts.methods[property] = descriptor.value as (this: any, ...args: any[]) => any;
         }
       }
