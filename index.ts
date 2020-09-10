@@ -1,6 +1,14 @@
-import 'reflect-metadata';
-import Vue, { ComponentOptions, CreateElement, PropOptions, VNode, WatchOptions, WatchOptionsWithHandler } from 'vue';
-import { LIFECYCLE_HOOKS } from 'vue/src/shared/constants.js';
+import type {
+  DebuggerEvent,
+  ComponentOptions,
+  VNode,
+  WatchOptions,
+  ComponentPublicInstance,
+  Prop as PropOptions,
+} from 'vue';
+
+// I removed the judgement in DecorateConstructor, the offical repo can't be used.
+import './reflect-metadata';
 
 const hasOwn: (obj: Record<PropertyKey, any>, key: PropertyKey) => boolean
   = Object.call.bind(Object.prototype.hasOwnProperty);
@@ -24,40 +32,55 @@ function isEmpty(obj: object) {
   return true;
 }
 
-const $internalHooks = new Set<string>(LIFECYCLE_HOOKS);
+const $internalHooks = new Set<string>([
+  'beforeCreate',
+  'created',
+  'beforeMount',
+  'mounted',
+  'beforeUpdate',
+  'updated',
+  'activated',
+  'deactivated',
+  'beforeUnmount',
+  'unmounted',
+  'render',
+  'renderTracked',
+  'renderTriggered',
+  'errorCaptured',
+
+  // deprecated
+  'beforeDestroy',
+  'destroyed',
+]);
+
+type DebuggerHook = (e: DebuggerEvent) => void;
+type ErrorCapturedHook = (err: unknown, instance: ComponentPublicInstance | null, info: string) => boolean | void;
 
 interface LifeCycleHook {
-  /** Called synchronously immediately after the instance has been initialized, before data observation and event/watcher setup. */
   beforeCreate?(): void;
-  /** Called synchronously after the instance is created. */
   created?(): void;
-  /** Called right before the mounting begins: the render function is about to be called for the first time. */
   beforeMount?(): void;
-  /** Called after the instance has been mounted, where el is replaced by the newly created vm.$el. */
   mounted?(): void;
-  /** Called when data changes, before the DOM is patched. */
   beforeUpdate?(): void;
-  /** Called after a data change causes the virtual DOM to be re-rendered and patched. */
   updated?(): void;
-  /** Called when a kept-alive component is activated. */
   activated?(): void;
-  /** Called when a kept-alive component is deactivated. */
   deactivated?(): void;
-  /** Called right before a Vue instance is destroyed. */
+  beforeUnmount?(): void;
+  unmounted?(): void;
+  /** @deprecated use beforeUnmount instead */
   beforeDestroy?(): void;
-  /** Called after a Vue instance has been destroyed. */
+  /** @deprecated use unmounted instead */
   destroyed?(): void;
-  /** Called when an error from any descendent component is captured. */
-  errorCaptured?(err: Error, vm: Vue, info: string): boolean | void;
-  serverPrefetch?(): Promise<void>;
 }
 
-interface VueComponentBase extends Vue, LifeCycleHook {
+interface VueComponentBase extends LifeCycleHook, ComponentPublicInstance {
   // eslint-disable-next-line @typescript-eslint/no-misused-new
   new(): VueComponentBase;
 
-  render?(createElement: CreateElement): VNode;
-  renderError?(createElement: CreateElement, err: Error): VNode;
+  render?(): VNode | VNode[];
+  renderTracked?: DebuggerHook;
+  renderTriggered?: DebuggerHook;
+  errorCaptured?: ErrorCapturedHook;
 }
 
 let currentComponentProps: Record<string, any>;
@@ -77,15 +100,18 @@ const VueField = Symbol('vue-decorate-field');
 
 function decorateField(type: string, data?: any) {
   return function decorate(prototype: any, field: string) {
-    if (!prototype[VueField]) prototype[VueField] = {};
+    if (!hasOwn(prototype, VueField)) prototype[VueField] = {};
     pushOrCreate(prototype[VueField], type, [field, data]);
-    Inreactive(prototype, field);
   };
 }
 
 export type Decorator = (prototype: any, prop: string) => void;
 
-export const Prop: (config?: PropOptions) => Decorator = decorateField.bind(null, 'props');
+export const Prop: (config?: PropOptions<any>) => Decorator = decorateField.bind(null, 'props');
+/**
+ * For `ref` in `v-for`, declare `ref="xxx"` in template as `:ref="x => refKey(index, x)"`
+ * @param refKey For normal ref, an alias of the default ref key name; For array ref, the function name used by ref declaration in template ( xxxRefFn by default )
+ */
 export const Ref: (refKey?: string) => Decorator = decorateField.bind(null, 'refs');
 
 const VueWatches = Symbol('vue-decorate-watch');
@@ -104,89 +130,105 @@ export function Hook(type: keyof LifeCycleHook) {
   };
 }
 
-export function Component(...mixins: ComponentOptions<any>[]) {
+export function Component(...mixins: ComponentOptions[]) {
   return (clazz: VueComponentBase) => {
     const { prototype } = clazz;
     if (!prototype[VueField]) prototype[VueField] = {};
 
-    const lifeCycles: Record<string, ((this: Vue) => void)[]> = {
-      beforeCreate: [function beforeCreate() {
-        currentComponentProps = isEmpty(this.$options.propsData)
+    const watcher: [() => any, (...args: any[]) => any, WatchOptions][] = [];
+    const refs: Record<string, PropertyDescriptor> = {};
+    const opts: ComponentOptions = {
+      mixins,
+
+      data() {
+        currentComponentProps = isEmpty(this.$props)
           ? Object.prototype
-          : this.$options.propsData;
+          : Object.assign({}, this.$props);
         const instance = new clazz();
-        if (currentComponentProps !== Object.prototype) Object.setPrototypeOf(instance, Object.prototype);
-
-        const inreactiveProps = [];
-
-        // 找到子类与所有父类的VueInreactive
-        for (let proto = clazz.prototype; proto && proto[VueInreactive]; proto = Object.getPrototypeOf(proto)) {
-          if (hasOwn(proto, VueInreactive)) { // 避免找到原型链上的VueInreactive出现重复
-            inreactiveProps.push(...proto[VueInreactive]);
-          }
+        if (currentComponentProps !== Object.prototype) {
+          Object.setPrototypeOf(instance, Object.prototype);
         }
 
-        for (const prop of inreactiveProps) {
-          if (prop in instance) {
-            if (instance[prop] !== undefined) {
-              const propDef: PropOptions<any> = this.$options.props[prop];
-              if (propDef) {
-                const val = instance[prop];
-                propDef.default = () => val; // Silence Vue dev warnings
-                if (propDef.type === Object) {
-                  propDef.type = Object(val).constructor;
-                }
-              } else {
-                this[prop] = instance[prop];
-              }
+        const inreactives = prototype[VueInreactive] as string[];
+        if (inreactives) {
+          inreactives.forEach(key => {
+            if (hasOwn(instance, key)) {
+              const temp = instance[key];
+              delete instance[key];
+              this[key] = temp;
             }
-            delete instance[prop];
-          }
+          })
         }
+        return instance;
+      },
 
-        this.$options.data = instance;
-
-        Object.defineProperties(this, Object.fromEntries<PropertyDescriptor>(
-          (prototype[VueField].refs || []).map(([field, refKey = field]) => [field, {
-            get() { return this.$refs[refKey]; },
-          }]),
-        ));
-      }],
-      created: [function created() {
-        Object.setPrototypeOf(this.$data, this);
-      }],
-    };
-
-    const opts: ComponentOptions<any> = {
-      mixins: [...mixins, lifeCycles],
-      props: Object.fromEntries<PropOptions>(
-        (prototype[VueField].props || []).map(([field, config = {} as any]) => [field,
-          !config.type
-            ? Object.assign({ type: Reflect.getMetadata('design:type', prototype, field) }, config)
-            : config,
-        ]),
-      ),
+      beforeCreate() {
+        Object.defineProperties(this, refs);
+      },
+      created() {
+        watcher.forEach(x => this.$watch(...x));
+      },
+      props: {},
       computed: {},
       methods: {},
       filters: {},
       watch: {},
     };
 
+    function addLifeCycleHook(prop: string, fn: (this: any) => void) {
+      opts.mixins.push({ [prop]: fn });
+    }
+
     const lifeCycleHook = new Set();
     // Forwards class methods to vue methods
     for (let proto = prototype; proto && proto !== Object.prototype; proto = Object.getPrototypeOf(proto)) {
+      if (hasOwn(proto, VueField)) {
+        (proto[VueField].props || []).map(([field, config = {} as any]) => {
+          opts.props[field] ||= !config.type
+            ? Object.assign({ type: Reflect.getMetadata('design:type', proto, field) }, config)
+            : config;
+        });
+
+        (proto[VueField].refs || []).forEach(([field, refKey]) => {
+          const type = Reflect.getMetadata('design:type', proto, field);
+
+          refs[field] ||= type !== Array
+            ? { get() { return this.$refs[refKey || field]; }, configurable: false }
+            : { value: [], configurable: false };
+
+          if (type === Array) {
+            opts.methods[refKey || field + 'RefFn'] ||= function updateRefField(index: number, component: any) {
+              if (component) {
+                this[field][index] = component;
+              } else {
+                this[field].length--;
+              }
+            }
+          }
+        });
+      }
+
       for (const [property, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(proto))) {
         if (property === 'constructor') continue;
         console.assert(typeof (descriptor.value || descriptor.get || descriptor.set) === 'function', `Don't set normal properties on prototype of the class`);
 
         if ($internalHooks.has(property)) {
-          if (!lifeCycleHook.has(property)) {
-            pushOrCreate(lifeCycles, property, descriptor.value);
-            lifeCycleHook.add(property);
+          // TODO: remove this
+          let fn = property;
+          switch (property) {
+            case 'beforeDestroy':
+              console.warn('`beforeDestroy` is deprecated, use `beforeUnmount` instead', descriptor.value);
+              fn = 'beforeUnmount';
+              break;
+            case 'destroyed':
+              console.warn('`destroyed` is deprecated, use `unmounted` instead', descriptor.value);
+              fn = 'unmounted';
+              break;
           }
-        } else if (property === 'render' || property === 'renderError') {
-          // render fn Cannot be an array
-          opts[property] = opts[property] || descriptor.value;
+          if (!lifeCycleHook.has(fn)) {
+            addLifeCycleHook(fn, descriptor.value);
+            lifeCycleHook.add(fn);
+          }
         } else if (descriptor.get || descriptor.set) {
           opts.computed[property] = opts.computed[property] || {
             get: descriptor.get,
@@ -199,25 +241,28 @@ export function Component(...mixins: ComponentOptions<any>[]) {
           }[];
           if (watches) {
             watches.forEach(({ prop, option }) => {
-              pushOrCreate(opts.watch, prop, {
-                ...option,
-                handler: descriptor.value,
-              } as WatchOptionsWithHandler<any>);
-            });
+              if (prop.includes('.') || prop.includes('[')) {
+                watcher.push([new Function('"use strict";return this.' + prop) as () => any, descriptor.value, option]);
+              } else {
+                pushOrCreate(opts.watch, prop, {
+                  ...option,
+                  handler: descriptor.value,
+                } as WatchOptions<any>);
+              }
+            })
           }
           const hooks = descriptor.value[VueHooks] as string[];
-          hooks?.forEach(hook => pushOrCreate(lifeCycles, hook, descriptor.value));
+          if (hooks) {
+            hooks.forEach(hook => addLifeCycleHook(hook, descriptor.value));
+          }
           opts.methods[property] = opts.methods[property] || descriptor.value as (this: any, ...args: any[]) => any;
         }
       }
     }
-
-    const resultFn = Vue.extend(opts) as any;
     // Copies static properties.
     // Note: Object.assign only copies enumerable properties, `name` and `prototype` are not enumerable.
     // WARNING: Vue has its own predefined static properties. Please make sure that they are not conflict.
-    Object.assign(resultFn, clazz);
-    return resultFn;
+    return Object.assign(opts, clazz) as any;
   };
 }
 
