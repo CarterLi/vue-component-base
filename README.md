@@ -4,14 +4,26 @@ For Vue 3.
 
 ## Functional difference from v2
 
-Default prop value with field init syntax won't work, use prop option instead.
+* Default prop value with field init syntax won't work, use prop option instead.
 
 ```ts
 // @Prop() readonly prop = 'default prop'; // Doesn't work
 @Prop({ default: 'default prop' }) prop: string; // Works
 ```
 
-Lifecycle hook `beforeDestroy` and `destroyed` are deprecated to follow the change of Vue 3, but they are still supported and are treated as the alias of `beforeUnmount` and `unmounted`.
+* For `@Ref` that maps an array ( i.e. `ref` used in `v-for` ), declare `ref="xxx"` in template as `:ref="x => xxxRefFn(index, x)"`
+
+```ts
+@Ref() divs: HTMLDivElement[];
+```
+
+```html
+<div v-for="(item, index) of [1, 2, 3]"
+     :key="item"
+     :ref="x => divsRefFn(index, x)"></div>
+```
+
+* Lifecycle hook `beforeDestroy` and `destroyed` are deprecated to follow the change of Vue 3, but they are still supported and are treated as the alias of `beforeUnmount` and `unmounted`.
 
 All other functions stay the same.
 
@@ -24,6 +36,8 @@ import { Component, VueComponentBase } from 'vue-component-base';
 export default class MyComponent extends VueComponentBase { // NOT `extends Vue`. Note `extends MyBaseComponent` works
   @Prop({ default: 'default prop' }) readonly prop: string; // https://github.com/kaorun343/vue-property-decorator#Prop
 
+  @Ref() readonly div: HTMLDivElement;
+
   foo = ''; // Normal property
   arrowFn = () => this.foo = 456; // Arrow function property
 
@@ -33,6 +47,8 @@ export default class MyComponent extends VueComponentBase { // NOT `extends Vue`
 
   @Inreactive // It's not reactive, useful for constant values
   readonly MY_CONSTANT = 'some constants';
+
+  setup(props: Record<string, any>, ctx: SetupContext) {} // setup function, you cannot use this in it
 
   mounted() {} // Lifecycle hook with intellisense
 

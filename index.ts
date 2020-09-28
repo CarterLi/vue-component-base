@@ -1,3 +1,4 @@
+import { isEmpty, mapValues } from 'lodash-es';
 import type {
   DebuggerEvent,
   ComponentOptions,
@@ -5,32 +6,12 @@ import type {
   WatchOptions,
   ComponentPublicInstance,
   Prop as PropOptions,
+  SetupContext,
 } from 'vue';
 
+import { pushOrCreate, hasOwn } from './helpers';
 // I removed the judgement in DecorateConstructor, the offical repo can't be used.
 import './reflect-metadata';
-
-const hasOwn: (obj: Record<PropertyKey, any>, key: PropertyKey) => boolean
-  = Object.call.bind(Object.prototype.hasOwnProperty);
-
-function pushOrCreate<T>(obj: Record<any, any>, key: any, value: T): T[] {
-  if (hasOwn(obj, key)) {
-    obj[key].push(value);
-  } else {
-    obj[key] = [value];
-  }
-  return obj[key];
-}
-
-function isEmpty(obj: object) {
-  for (const key in obj) {
-    if (hasOwn(obj, key)) {
-      return false;
-    }
-  }
-
-  return true;
-}
 
 const $internalHooks = new Set<string>([
   'beforeCreate',
@@ -43,6 +24,8 @@ const $internalHooks = new Set<string>([
   'deactivated',
   'beforeUnmount',
   'unmounted',
+
+  'setup',
   'render',
   'renderTracked',
   'renderTriggered',
@@ -77,6 +60,7 @@ interface VueComponentBase extends LifeCycleHook, ComponentPublicInstance {
   // eslint-disable-next-line @typescript-eslint/no-misused-new
   new(): VueComponentBase;
 
+  setup?(this: void, props: Record<string, any>, ctx: SetupContext): Record<string, any> | void;
   render?(): VNode | VNode[];
   renderTracked?: DebuggerHook;
   renderTriggered?: DebuggerHook;
@@ -138,7 +122,7 @@ export function Component(...mixins: ComponentOptions[]) {
     const watcher: [() => any, (...args: any[]) => any, WatchOptions][] = [];
     const refs: Record<string, PropertyDescriptor> = {};
     const opts: ComponentOptions = {
-      mixins,
+      mixins: mixins.concat({}),
 
       data() {
         currentComponentProps = isEmpty(this.$props)
@@ -163,7 +147,7 @@ export function Component(...mixins: ComponentOptions[]) {
       },
 
       beforeCreate() {
-        Object.defineProperties(this, refs);
+        Object.defineProperties(this, mapValues(refs, x => x || { value: [], configurable: false }));
       },
       created() {
         watcher.forEach(x => this.$watch(...x));
@@ -176,14 +160,24 @@ export function Component(...mixins: ComponentOptions[]) {
     };
 
     function addLifeCycleHook(prop: string, fn: (this: any) => void) {
-      opts.mixins.push({ [prop]: fn });
+      if (prop === 'setup') {
+        // `setup` cannot be in mixins but `render` can ( strangely )
+        opts.setup = fn;
+      } else {
+        const mixin = opts.mixins[opts.mixins.length - 1];
+        if (hasOwn(mixin, prop)) {
+          mixins.push({ [prop]: fn });
+        } else {
+          mixin[prop] = fn;
+        }
+      }
     }
 
     const lifeCycleHook = new Set();
     // Forwards class methods to vue methods
     for (let proto = prototype; proto && proto !== Object.prototype; proto = Object.getPrototypeOf(proto)) {
       if (hasOwn(proto, VueField)) {
-        (proto[VueField].props || []).map(([field, config = {} as any]) => {
+        (proto[VueField].props || []).forEach(([field, config = {} as any]) => {
           opts.props[field] ||= !config.type
             ? Object.assign({ type: Reflect.getMetadata('design:type', proto, field) }, config)
             : config;
@@ -193,8 +187,8 @@ export function Component(...mixins: ComponentOptions[]) {
           const type = Reflect.getMetadata('design:type', proto, field);
 
           refs[field] ||= type !== Array
-            ? { get() { return this.$refs[refKey || field]; }, configurable: false }
-            : { value: [], configurable: false };
+            ? { get() { return this._.refs[refKey || field]; }, configurable: false }
+            : null;
 
           if (type === Array) {
             opts.methods[refKey || field + 'RefFn'] ||= function updateRefField(index: number, component: any) {
