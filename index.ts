@@ -1,4 +1,4 @@
-import { isEmpty, mapValues } from 'lodash-es';
+import { mapValues } from 'lodash-es';
 import type {
   DebuggerEvent,
   ComponentOptions,
@@ -67,11 +67,9 @@ interface VueComponentBase extends LifeCycleHook, ComponentPublicInstance {
   errorCaptured?: ErrorCapturedHook;
 }
 
-let currentComponentProps: Record<string, any>;
-
 /** A fake base class generally for static type checking of TypeScript */
 export const VueComponentBase = class {
-  constructor() { return Object.create(currentComponentProps); }
+  constructor() { return {}; }
 } as any as VueComponentBase;
 
 const VueInreactive = Symbol('vue-inreactive');
@@ -122,16 +120,11 @@ export function Component(...mixins: ComponentOptions[]) {
     const watcher: [() => any, (...args: any[]) => any, WatchOptions][] = [];
     const refs: Record<string, PropertyDescriptor> = {};
     const opts: ComponentOptions = {
+      name: mixins.find(x => x.name)?.name || clazz.name,
       mixins: mixins.concat({}),
 
       data() {
-        currentComponentProps = isEmpty(this.$props)
-          ? Object.prototype
-          : Object.assign({}, this.$props);
         const instance = new clazz();
-        if (currentComponentProps !== Object.prototype) {
-          Object.setPrototypeOf(instance, Object.prototype);
-        }
 
         const inreactives = prototype[VueInreactive] as string[];
         if (inreactives) {
@@ -139,9 +132,9 @@ export function Component(...mixins: ComponentOptions[]) {
             if (hasOwn(instance, key)) {
               const temp = instance[key];
               delete instance[key];
-              this[key] = temp;
+              (this as any)[key] = temp;
             }
-          })
+          });
         }
         return instance;
       },
@@ -197,7 +190,7 @@ export function Component(...mixins: ComponentOptions[]) {
               } else {
                 this[field].length--;
               }
-            }
+            };
           }
         });
       }
@@ -236,6 +229,7 @@ export function Component(...mixins: ComponentOptions[]) {
           if (watches) {
             watches.forEach(({ prop, option }) => {
               if (prop.includes('.') || prop.includes('[')) {
+                // eslint-disable-next-line @typescript-eslint/no-implied-eval
                 watcher.push([new Function('"use strict";return this.' + prop) as () => any, descriptor.value, option]);
               } else {
                 pushOrCreate(opts.watch, prop, {
@@ -243,7 +237,7 @@ export function Component(...mixins: ComponentOptions[]) {
                   handler: descriptor.value,
                 } as WatchOptions<any>);
               }
-            })
+            });
           }
           const hooks = descriptor.value[VueHooks] as string[];
           if (hooks) {
