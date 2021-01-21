@@ -1,7 +1,18 @@
 {
   "name": "vue3-component-base",
-  "version": "0.0.1",
-  "main": "index.ts",
+  "version": "0.0.2",
+  "main": "index.js",
+  "module": "index.js",
+  "types": "index.d.js",
+  "keywords": [
+    "vue",
+    "component",
+    "class"
+  ],
+  "bugs": {
+    "url": "https://github.com/CarterLi/vue-component-base/issues",
+    "email": "carter.li@eoitek.com"
+  },
   "repository": "git@github.com:CarterLi/vue-component-base.git",
   "author": "李通洲 <carter.li@eoitek.com>",
   "license": "MIT",
@@ -15,6 +26,6 @@
     "typescript": "^4.1.3"
   },
   "scripts": {
-    "build": "tsc -p ."
+    "build": "tsc -d -p ."
   }
 }
