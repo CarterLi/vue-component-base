@@ -1,4 +1,4 @@
-import { mapValues } from 'lodash-es';
+import { mapValues, has as hasOwn } from 'lodash-es';
 import type {
   DebuggerEvent,
   ComponentOptions,
@@ -9,9 +9,16 @@ import type {
   SetupContext,
 } from 'vue';
 
-import { pushOrCreate, hasOwn } from './helpers';
-// I removed the judgement in DecorateConstructor, the offical repo can't be used.
 import './reflect-metadata';
+
+export function pushOrCreate<T>(obj: Record<any, any>, key: any, value: T): T[] {
+  if (hasOwn(obj, key)) {
+    obj[key].push(value);
+  } else {
+    obj[key] = [value];
+  }
+  return obj[key];
+}
 
 const $internalHooks = new Set<string>([
   'beforeCreate',
