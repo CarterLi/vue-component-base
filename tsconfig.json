@@ -3,37 +3,16 @@
     "target": "esnext",
     "module": "esnext",
     "strict": false,
-    "jsx": "preserve",
     "importHelpers": true,
     "moduleResolution": "node",
-    "experimentalDecorators": true,
     "esModuleInterop": true,
-    "emitDecoratorMetadata": true,
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": [
-        "src/*"
-      ]
-    },
     "lib": [
       "esnext",
-      "es2019",
-      "es2019.object",
-      "es2018",
-      "es2018.promise",
-      "es2017",
-      "es2017.object",
-      "es2017.string",
       "dom",
-      "dom.iterable",
-      "scripthost"
     ]
   },
-  "include": [
-    "*.ts",
-  ],
   "exclude": [
     "node_modules"
   ]

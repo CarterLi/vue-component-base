@@ -1,4 +1,4 @@
-# VueComponentBase
+# VueComponentBase for Vue 2.x
 
 Due to the design of https://github.com/vuejs/vue-class-component and https://github.com/kaorun343/vue-property-decorator, they have some limitations ( holes ) that you may encounter.
 
