@@ -65,13 +65,14 @@ export function Hook(type) {
 }
 export function Component(...mixins) {
     return (clazz) => {
+        var _a;
         const { prototype } = clazz;
         if (!prototype[VueField])
             prototype[VueField] = {};
         const watcher = [];
         const refs = {};
         const opts = {
-            name: mixins.find(x => x.name)?.name || clazz.name,
+            name: ((_a = mixins.find(x => x.name)) === null || _a === void 0 ? void 0 : _a.name) || clazz.name,
             mixins: mixins.concat({}),
             data() {
                 const instance = new clazz();
