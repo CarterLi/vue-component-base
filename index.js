@@ -119,24 +119,26 @@ export function Component(...mixins) {
         for (let proto = prototype; proto && proto !== Object.prototype; proto = Object.getPrototypeOf(proto)) {
             if (hasOwn(proto, VueField)) {
                 (proto[VueField].props || []).forEach(([field, config = {}]) => {
-                    opts.props[field] ||= !config.type
+                    var _a;
+                    (_a = opts.props)[field] || (_a[field] = !config.type
                         ? Object.assign({ type: Reflect.getMetadata('design:type', proto, field) }, config)
-                        : config;
+                        : config);
                 });
                 (proto[VueField].refs || []).forEach(([field, refKey]) => {
+                    var _a, _b;
                     const type = Reflect.getMetadata('design:type', proto, field);
-                    refs[field] ||= type !== Array
+                    refs[field] || (refs[field] = type !== Array
                         ? { get() { return this._.refs[refKey || field]; }, configurable: false }
-                        : null;
+                        : null);
                     if (type === Array) {
-                        opts.methods[refKey || field + 'RefFn'] ||= function updateRefField(index, component) {
+                        (_a = opts.methods)[_b = refKey || field + 'RefFn'] || (_a[_b] = function updateRefField(index, component) {
                             if (component) {
                                 this[field][index] = component;
                             }
                             else {
                                 this[field].length--;
                             }
-                        };
+                        });
                     }
                 });
             }
