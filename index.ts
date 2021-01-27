@@ -1,4 +1,4 @@
-import { mapValues, has as hasOwn } from 'lodash-es';
+import { mapValues } from 'lodash-es';
 import type {
   DebuggerEvent,
   ComponentOptions,
@@ -10,15 +10,7 @@ import type {
 } from 'vue';
 
 import './reflect-metadata';
-
-export function pushOrCreate<T>(obj: Record<any, any>, key: any, value: T): T[] {
-  if (hasOwn(obj, key)) {
-    obj[key].push(value);
-  } else {
-    obj[key] = [value];
-  }
-  return obj[key];
-}
+import { hasOwn, pushOrCreate } from './helpers';
 
 const $internalHooks = new Set<string>([
   'beforeCreate',

@@ -1,14 +1,6 @@
-import { mapValues, has as hasOwn } from 'lodash-es';
+import { mapValues } from 'lodash-es';
 import './reflect-metadata';
-export function pushOrCreate(obj, key, value) {
-    if (hasOwn(obj, key)) {
-        obj[key].push(value);
-    }
-    else {
-        obj[key] = [value];
-    }
-    return obj[key];
-}
+import { hasOwn, pushOrCreate } from './helpers';
 const $internalHooks = new Set([
     'beforeCreate',
     'created',

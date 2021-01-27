@@ -1,6 +1,6 @@
 {
   "name": "vue3-component-base",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "main": "index.js",
   "module": "index.js",
   "types": "index.d.js",

@@ -1,6 +1,5 @@
 import type { DebuggerEvent, ComponentOptions, VNode, WatchOptions, ComponentPublicInstance, Prop as PropOptions, SetupContext } from 'vue';
 import './reflect-metadata';
-export declare function pushOrCreate<T>(obj: Record<any, any>, key: any, value: T): T[];
 declare type DebuggerHook = (e: DebuggerEvent) => void;
 declare type ErrorCapturedHook = (err: unknown, instance: ComponentPublicInstance | null, info: string) => boolean | void;
 interface LifeCycleHook {
