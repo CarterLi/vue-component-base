@@ -1,16 +1,9 @@
-import { isEmpty, has as hasOwn } from 'lodash-es';
+import { isEmpty } from 'lodash-es';
 import 'reflect-metadata';
 import Vue, { ComponentOptions, CreateElement, PropOptions, VNode, WatchOptions, WatchOptionsWithHandler } from 'vue';
 import { LIFECYCLE_HOOKS } from 'vue/src/shared/constants.js';
 
-export function pushOrCreate<T>(obj: Record<any, any>, key: any, value: T): T[] {
-  if (hasOwn(obj, key)) {
-    obj[key].push(value);
-  } else {
-    obj[key] = [value];
-  }
-  return obj[key];
-}
+import { pushOrCreate, hasOwn } from './helpers';
 
 const $internalHooks = new Set<string>(LIFECYCLE_HOOKS);
 

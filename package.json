@@ -1,16 +1,19 @@
 {
   "name": "vue2-component-base",
-  "version": "0.0.1",
-  "main": "index.ts",
+  "version": "0.0.2",
+  "main": "index.js",
+  "module": "index.js",
+  "types": "index.d.ts",
   "repository": "git@github.com:CarterLi/vue-component-base.git",
   "author": "李通洲 <carter.li@eoitek.com>",
   "license": "MIT",
   "scripts": {
-    "build": "tsc -p ."
+    "build": "tsc -d -p ."
   },
   "dependencies": {
     "lodash-es": "^4.17.20",
     "reflect-metadata": "^0.1.13",
+    "tslib": "^2.1.0",
     "vue": "^2.6.12"
   },
   "devDependencies": {
