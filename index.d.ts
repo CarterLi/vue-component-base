@@ -1,4 +1,4 @@
-import type { DebuggerEvent, ComponentOptions, VNode, WatchOptions, ComponentPublicInstance, Prop as PropOptions, SetupContext } from 'vue';
+import type { DebuggerEvent, ComponentOptions, WatchOptions, ComponentPublicInstance, Prop as PropOptions, SetupContext } from 'vue';
 import './reflect-metadata';
 declare type DebuggerHook = (e: DebuggerEvent) => void;
 declare type ErrorCapturedHook = (err: unknown, instance: ComponentPublicInstance | null, info: string) => boolean | void;
@@ -21,7 +21,7 @@ interface LifeCycleHook {
 interface VueComponentBase extends LifeCycleHook, ComponentPublicInstance {
     new (): VueComponentBase;
     setup?(this: void, props: Record<string, any>, ctx: SetupContext): Record<string, any> | void;
-    render?(): VNode | VNode[];
+    render?(): any;
     renderTracked?: DebuggerHook;
     renderTriggered?: DebuggerHook;
     errorCaptured?: ErrorCapturedHook;

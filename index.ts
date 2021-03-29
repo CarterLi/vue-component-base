@@ -60,7 +60,7 @@ interface VueComponentBase extends LifeCycleHook, ComponentPublicInstance {
   new(): VueComponentBase;
 
   setup?(this: void, props: Record<string, any>, ctx: SetupContext): Record<string, any> | void;
-  render?(): VNode | VNode[];
+  render?(): any;
   renderTracked?: DebuggerHook;
   renderTriggered?: DebuggerHook;
   errorCaptured?: ErrorCapturedHook;
