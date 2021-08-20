@@ -2,7 +2,6 @@ import { mapValues } from 'lodash-es';
 import type {
   DebuggerEvent,
   ComponentOptions,
-  VNode,
   WatchOptions,
   ComponentPublicInstance,
   Prop as PropOptions,
