@@ -94,6 +94,8 @@ export const Prop: (config?: PropOptions<any>) => Decorator = decorateField.bind
  */
 export const Ref: (refKey?: string) => Decorator = decorateField.bind(null, 'refs');
 
+export const Inject: (option?: ComponentOptions['inject']) => Decorator = decorateField.bind(null, 'injects');
+
 const VueWatches = Symbol('vue-decorate-watch');
 
 export function Watch(prop?: string, option?: WatchOptions): Decorator {
@@ -168,13 +170,13 @@ export function Component(...mixins: ComponentOptions[]) {
     // Forwards class methods to vue methods
     for (let proto = prototype; proto && proto !== Object.prototype; proto = Object.getPrototypeOf(proto)) {
       if (hasOwn(proto, VueField)) {
-        (proto[VueField].props || []).forEach(([field, config = {} as any]) => {
+        proto[VueField].props?.forEach(([field, config = {} as any]) => {
           opts.props[field] ||= !config.type
             ? Object.assign({ type: Reflect.getMetadata('design:type', proto, field) }, config)
             : config;
         });
 
-        (proto[VueField].refs || []).forEach(([field, refKey]) => {
+        proto[VueField].refs?.forEach(([field, refKey]) => {
           const type = Reflect.getMetadata('design:type', proto, field);
 
           refs[field] ||= type !== Array
@@ -190,6 +192,11 @@ export function Component(...mixins: ComponentOptions[]) {
               }
             };
           }
+        });
+
+        proto[VueField].injects?.forEach(([field, option]) => {
+          opts.inject ||= {};
+          opts.inject[field] = option || field;
         });
       }
 

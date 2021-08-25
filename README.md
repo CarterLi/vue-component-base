@@ -36,7 +36,9 @@ import { Component, VueComponentBase } from 'vue-component-base';
 export default class MyComponent extends VueComponentBase { // NOT `extends Vue`. Note `extends MyBaseComponent` works
   @Prop({ default: 'default prop' }) readonly prop: string; // https://github.com/kaorun343/vue-property-decorator#Prop
 
-  @Ref() readonly div: HTMLDivElement;
+  @Ref() readonly div: HTMLDivElement; // $refs.div
+
+  @Inject() inject readonly: Something; // inject
 
   foo = ''; // Normal property
   arrowFn = () => this.foo = 456; // Arrow function property

@@ -36,6 +36,7 @@ export declare const Prop: (config?: PropOptions<any>) => Decorator;
  * @param refKey For normal ref, an alias of the default ref key name; For array ref, the function name used by ref declaration in template ( xxxRefFn by default )
  */
 export declare const Ref: (refKey?: string) => Decorator;
+export declare const Inject: (option?: ComponentOptions['inject']) => Decorator;
 export declare function Watch(prop?: string, option?: WatchOptions): Decorator;
 export declare function Hook(type: keyof LifeCycleHook): (clazz: any, fn: string) => void;
 export declare function Component(...mixins: ComponentOptions[]): (clazz: VueComponentBase) => any;
