@@ -10,6 +10,7 @@
     "esModuleInterop": true,
     "emitDecoratorMetadata": true,
     "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
@@ -19,16 +20,8 @@
     },
     "lib": [
       "esnext",
-      "es2019",
-      "es2019.object",
-      "es2018",
-      "es2018.promise",
-      "es2017",
-      "es2017.object",
-      "es2017.string",
       "dom",
-      "dom.iterable",
-      "scripthost"
+      "dom.iterable"
     ]
   },
   "include": [

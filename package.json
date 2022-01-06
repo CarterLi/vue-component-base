@@ -3,6 +3,7 @@
   "version": "0.0.8",
   "main": "index.js",
   "module": "index.js",
+  "type": "module",
   "types": "index.d.ts",
   "keywords": [
     "vue",
@@ -19,11 +20,11 @@
   "dependencies": {
     "lodash-es": "^4.17.21",
     "tslib": "^2.3.1",
-    "vue": "^3.2.6"
+    "vue": "^3.2.26"
   },
   "devDependencies": {
-    "@types/lodash-es": "^4.17.4",
-    "typescript": "^4.3.5"
+    "@types/lodash-es": "^4.17.5",
+    "typescript": "^4.5.4"
   },
   "scripts": {
     "build": "tsc -d -p ."
