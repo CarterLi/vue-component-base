@@ -1,6 +1,6 @@
 import { mapValues } from 'lodash-es';
-import './reflect-metadata';
-import { hasOwn, pushOrCreate } from './helpers';
+import './reflect-metadata.js';
+import { hasOwn, pushOrCreate } from './helpers.js';
 const $internalHooks = new Set([
     'beforeCreate',
     'created',
